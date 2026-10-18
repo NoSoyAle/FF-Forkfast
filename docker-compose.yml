@@ -1,0 +1,55 @@
+services:
+  backend:
+    build: ./backend
+    container_name: forkfast-backend
+    ports:
+      - "8080:8080"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-forkfast}
+      RABBITMQ_PASS: ${RABBITMQ_PASS:-forkfast}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    # Límite de memoria recomendado para no reventar un t3.micro (1GB RAM total)
+    mem_limit: 450m
+
+  frontend:
+    build: ./frontend
+    container_name: forkfast-frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Certificados autofirmados generados en el host (ver README).
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+    mem_limit: 100m
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-forkfast}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-forkfast}
+    ports:
+      # Los puertos del host se publican solo en localhost; backend y RabbitMQ se
+      # comunican por la red interna de Compose. En EC2, acceder a la UI por túnel SSH.
+      - "127.0.0.1:${RABBITMQ_AMQP_HOST_PORT:-5673}:5672"
+      - "127.0.0.1:${RABBITMQ_MANAGEMENT_HOST_PORT:-15673}:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+    mem_limit: 300m
+
+volumes:
+  rabbitmq_data:

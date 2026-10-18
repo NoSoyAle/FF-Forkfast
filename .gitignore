@@ -1,0 +1,6 @@
+# Certificados autofirmados (contienen la llave privada: NO subir a GitHub)
+certs/
+.env
+*.key
+*.crt
+*.pem
